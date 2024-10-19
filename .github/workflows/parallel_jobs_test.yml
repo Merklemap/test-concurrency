@@ -1,27 +1,43 @@
-name: Parallel Jobs Test
+name: 500 Parallel Jobs Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  setup:
+  generate_job_batches:
     runs-on: ubuntu-latest
     steps:
       - id: set-matrix
         run: |
-          matrix=$(printf '%s\n' {1..256} | jq -R . | jq -sc .)
-          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+          batch1=$(seq 1 250 | jq -R . | jq -sc .)
+          batch2=$(seq 251 500 | jq -R . | jq -sc .)
+          echo "batch1=$batch1" >> $GITHUB_OUTPUT
+          echo "batch2=$batch2" >> $GITHUB_OUTPUT
     outputs:
-      matrix: ${{ steps.set-matrix.outputs.matrix }}
+      batch1: ${{ steps.set-matrix.outputs.batch1 }}
+      batch2: ${{ steps.set-matrix.outputs.batch2 }}
 
-  run_jobs:
-    needs: setup
+  run_jobs_batch1:
+    needs: generate_job_batches
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        job: ${{ fromJson(needs.setup.outputs.matrix) }}
+        job: ${{ fromJson(needs.generate_job_batches.outputs.batch1) }}
       fail-fast: false
-      max-parallel: 600
+    steps:
+      - name: Run job ${{ matrix.job }}
+        run: |
+          echo "Starting job ${{ matrix.job }}"
+          sleep 600
+          echo "Job ${{ matrix.job }} completed"
+
+  run_jobs_batch2:
+    needs: generate_job_batches
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        job: ${{ fromJson(needs.generate_job_batches.outputs.batch2) }}
+      fail-fast: false
     steps:
       - name: Run job ${{ matrix.job }}
         run: |
@@ -30,8 +46,8 @@ jobs:
           echo "Job ${{ matrix.job }} completed"
 
   summary:
-    needs: run_jobs
+    needs: [run_jobs_batch1, run_jobs_batch2]
     runs-on: ubuntu-latest
     steps:
       - name: Summarize
-        run: echo "All 600 jobs completed"
+        run: echo "All 500 jobs completed"
