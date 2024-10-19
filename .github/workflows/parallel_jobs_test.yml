@@ -1,0 +1,37 @@
+name: Parallel Jobs Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - id: set-matrix
+        run: |
+          matrix=$(printf '%s\n' {1..256} | jq -R . | jq -sc .)
+          echo "matrix=$matrix" >> $GITHUB_OUTPUT
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+
+  run_jobs:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        job: ${{ fromJson(needs.setup.outputs.matrix) }}
+      fail-fast: false
+      max-parallel: 600
+    steps:
+      - name: Run job ${{ matrix.job }}
+        run: |
+          echo "Starting job ${{ matrix.job }}"
+          sleep 60
+          echo "Job ${{ matrix.job }} completed"
+
+  summary:
+    needs: run_jobs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summarize
+        run: echo "All 600 jobs completed"
